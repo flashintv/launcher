@@ -4,6 +4,7 @@ Developers & Contributors
 - koolych
 - Ways
 - Grizzle
+- Simpy
 
 Maintainer
 - eddies
