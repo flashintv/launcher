@@ -5,6 +5,7 @@ using SharpCompress.Archives.SevenZip;
 using SharpCompress.Common;
 using SharpCompress.Readers;
 using Spectre.Console;
+using System.Diagnostics;
 
 namespace Wauncher.Utils
 {
@@ -281,7 +282,31 @@ namespace Wauncher.Utils
                 throw new Exception("Steam does not appear to be installed or you are not logged in.");
 
             onStatus?.Invoke("Fetching game files...");
-            var gameFiles = await Api.ClassicCounter.GetFullGameDownload(Steam.recentSteamID2);
+            FullGameDownloadResponse gameFiles;
+            try
+            {
+                gameFiles = await Api.ClassicCounter.GetFullGameDownload(Steam.recentSteamID2);
+            }
+            catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                throw new Exception("Not whitelisted. Visit classiccounter.cc/whitelist");
+            }
+            catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                throw new Exception("Wrong Steam account or not logged in");
+            }
+            catch (ApiException ex) when ((int)ex.StatusCode >= 500)
+            {
+                throw new Exception("Download server is down. Try again soon");
+            }
+            catch (ApiException)
+            {
+                throw new Exception("Couldn't fetch game files. Try again soon");
+            }
+            catch (HttpRequestException)
+            {
+                throw new Exception("No internet or server unreachable");
+            }
 
             if (gameFiles?.Files == null || gameFiles.Files.Count == 0)
                 throw new Exception("No game files returned. You may not be whitelisted.\nVisit classiccounter.cc/whitelist to request access.");
@@ -312,7 +337,7 @@ namespace Wauncher.Utils
                 completed++;
             }
 
-            onStatus?.Invoke("Extracting game files...");
+            onStatus?.Invoke("Extracting game files... This may take a few minutes.");
             await ExtractSplitArchive(gameFiles.Files.Select(f => f.File).ToList(), onExtractProgress);
         }
 
@@ -387,10 +412,36 @@ namespace Wauncher.Utils
             {
                 Directory.CreateDirectory(tempExtractPath);
 
-                if (Debug.Enabled())
-                    Terminal.Debug("Starting in-process extraction to temp directory...");
+                await Download7za();
 
-                await ExtractSplitArchiveToDirectory(files, tempExtractPath, onProgress);
+                string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
+                if (launcherDir == null)
+                    throw new InvalidOperationException("Could not determine launcher directory");
+
+                string exePath = Path.Combine(launcherDir, "7za.exe");
+
+                if (Debug.Enabled())
+                    Terminal.Debug("Starting 7za extraction to temp directory...");
+
+                using (var process = new Process())
+                {
+                    process.StartInfo = new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        Arguments = $"x \"{firstFile}\" -o\"{tempExtractPath}\" -y",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    };
+
+                    process.Start();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode != 0)
+                        throw new Exception($"7za extraction failed with exit code: {process.ExitCode}");
+                }
+
+                onProgress?.Invoke(100.0);
 
                 string classicCounterPath = Path.Combine(tempExtractPath, "ClassicCounter");
                 if (Directory.Exists(classicCounterPath))
@@ -416,6 +467,8 @@ namespace Wauncher.Utils
                         if (Debug.Enabled())
                             Terminal.Debug($"Deleted archive part: {file}");
                     }
+
+                    Delete7zaExecutable();
                 }
                 catch (Exception ex)
                 {
@@ -437,6 +490,8 @@ namespace Wauncher.Utils
                         Directory.Delete(tempExtractPath, true);
                 }
                 catch { }
+
+                Delete7zaExecutable();
 
                 throw;
             }
@@ -486,10 +541,12 @@ namespace Wauncher.Utils
             {
                 string newFilePath = filePath.Replace(classicCounterPath, extractPath);
 
-                if (Path.GetFileName(filePath).Equals("launcher.exe", StringComparison.OrdinalIgnoreCase))
+                string fileName = Path.GetFileName(filePath);
+                if (fileName.Equals("launcher.exe", StringComparison.OrdinalIgnoreCase) ||
+                    fileName.Equals("wauncher.exe", StringComparison.OrdinalIgnoreCase))
                 {
                     if (Debug.Enabled())
-                        Terminal.Debug("Skipping launcher.exe");
+                        Terminal.Debug($"Skipping {fileName}");
                     continue;
                 }
 
@@ -505,6 +562,64 @@ namespace Wauncher.Utils
                 {
                     Terminal.Warning($"Failed to move file {filePath}: {ex.Message}");
                 }
+            }
+        }
+
+        private static async Task Download7za()
+        {
+            string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
+            if (launcherDir == null)
+                throw new InvalidOperationException("Could not determine launcher directory");
+
+            string exePath = Path.Combine(launcherDir, "7za.exe");
+            if (File.Exists(exePath))
+                return;
+
+            string[] fallbackUrls =
+            {
+                "https://fastdl.classiccounter.cc/7za.exe",
+                "https://ollumcc.github.io/7za.exe"
+            };
+
+            Exception? lastError = null;
+            foreach (var url in fallbackUrls)
+            {
+                try
+                {
+                    await _downloader.DownloadFileTaskAsync(url, exePath);
+                    if (File.Exists(exePath))
+                        return;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                }
+            }
+
+            throw new Exception($"Couldn't download 7za.exe{(lastError != null ? $": {lastError.Message}" : string.Empty)}");
+        }
+
+        private static void Delete7zaExecutable()
+        {
+            try
+            {
+                string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
+                if (string.IsNullOrWhiteSpace(launcherDir))
+                    return;
+
+                string exePath = Path.Combine(launcherDir, "7za.exe");
+                if (!File.Exists(exePath))
+                    return;
+
+                File.Delete(exePath);
+
+                if (Debug.Enabled())
+                    Terminal.Debug("Deleted 7za.exe");
+            }
+            catch (Exception ex)
+            {
+                if (Debug.Enabled())
+                    Terminal.Debug($"Failed to delete 7za.exe: {ex.Message}");
             }
         }
 

@@ -46,6 +46,14 @@ namespace Wauncher
                     return;
                 }
 
+                if (Game.IsRunning())
+                {
+                    Wauncher.Utils.ConsoleManager.ShowError(
+                        "ClassicCounter is already running.\n\nPlease close the game before opening Wauncher again.");
+                    desktop.Shutdown();
+                    return;
+                }
+
                 bool hasRecentSteamUser = Steam.GetRecentLoggedInSteamID(false).GetAwaiter().GetResult();
                 if (!hasRecentSteamUser)
                 {

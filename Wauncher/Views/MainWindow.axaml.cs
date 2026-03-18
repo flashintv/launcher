@@ -533,6 +533,14 @@ namespace Wauncher.Views
             try
             {
                 _settings = SettingsWindowViewModel.LoadGlobal();
+                var selected = vm?.SelectedServer;
+
+                if (selected != null && !selected.IsNone && !string.IsNullOrEmpty(selected.IpPort) && Game.IsRunning())
+                {
+                    Wauncher.Utils.ConsoleManager.ShowError(
+                        "ClassicCounter is already running.\n\nPlease close the game before joining a server from Wauncher.");
+                    return;
+                }
 
                 if (vm != null) vm.GameStatus = "Running";
 
@@ -546,14 +554,15 @@ namespace Wauncher.Views
                         Argument.AddArgument(arg);
                 }
 
-                var selected = vm?.SelectedServer;
                 if (selected != null && !selected.IsNone && !string.IsNullOrEmpty(selected.IpPort))
                 {
                     Argument.AddArgument("+connect");
                     Argument.AddArgument(selected.IpPort);
                 }
 
-                await Game.Launch();
+                var launched = await Game.Launch();
+                if (!launched)
+                    return;
 
                 if (_settings.MinimizeToTray) Hide();
 
@@ -776,10 +785,11 @@ namespace Wauncher.Views
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
+                            bool isExtracting = status.Contains("Extracting", StringComparison.OrdinalIgnoreCase);
                             vm.UpdateStatusFile    = status;
-                            vm.UpdateStatusSpeed   = "";
-                            vm.UpdateIndeterminate = !status.Contains("Extracting", StringComparison.OrdinalIgnoreCase);
-                            if (!vm.UpdateIndeterminate)
+                            vm.UpdateStatusSpeed   = isExtracting ? "Large installs can take a few minutes." : "";
+                            vm.UpdateIndeterminate = isExtracting;
+                            if (isExtracting)
                                 vm.UpdateProgress = 0;
                         });
                     },
@@ -787,10 +797,13 @@ namespace Wauncher.Views
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
-                            vm.UpdateIndeterminate = false;
-                            vm.UpdateStatusFile    = $"Extracting game files... {extractPercent:F0}%";
-                            vm.UpdateStatusSpeed   = "";
-                            vm.UpdateProgress      = extractPercent;
+                            if (extractPercent >= 100)
+                            {
+                                vm.UpdateIndeterminate = false;
+                                vm.UpdateStatusFile    = "Finalizing extracted files...";
+                                vm.UpdateStatusSpeed   = "";
+                                vm.UpdateProgress      = 100;
+                            }
                         });
                     });
 

@@ -16,6 +16,19 @@ namespace Wauncher.Utils
         private static int _scoreCT = 0;
         private static int _scoreT = 0;
 
+        public static bool IsRunning()
+        {
+            try
+            {
+                return Process.GetProcessesByName("csgo").Length > 0 ||
+                       Process.GetProcessesByName("cc").Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static async Task<bool> Launch()
         {
             List<string> arguments = Argument.GenerateGameArguments();
