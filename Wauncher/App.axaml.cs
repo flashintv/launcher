@@ -32,34 +32,34 @@ namespace Wauncher
 
                 if (!Steam.IsInstalled())
                 {
-                    Wauncher.Utils.ConsoleManager.ShowError(
+                    ConsoleManager.ShowError(
                         "Steam is required to use Wauncher.\n\nPlease install Steam and relaunch.");
-                    desktop.Shutdown();
+                    Environment.Exit(1);
                     return;
                 }
 
                 if (!IsSteamRunning())
                 {
-                    Wauncher.Utils.ConsoleManager.ShowError(
+                    ConsoleManager.ShowError(
                         "Steam must be open before using Wauncher.\n\nPlease open Steam, then relaunch Wauncher.");
-                    desktop.Shutdown();
+                    Environment.Exit(2);
                     return;
                 }
 
                 if (Game.IsRunning())
                 {
-                    Wauncher.Utils.ConsoleManager.ShowError(
+                    ConsoleManager.ShowError(
                         "ClassicCounter is already running.\n\nPlease close the game before opening Wauncher again.");
-                    desktop.Shutdown();
+                    Environment.Exit(3);
                     return;
                 }
 
                 bool hasRecentSteamUser = Steam.GetRecentLoggedInSteamID(false).GetAwaiter().GetResult();
                 if (!hasRecentSteamUser)
                 {
-                    Wauncher.Utils.ConsoleManager.ShowError(
+                    ConsoleManager.ShowError(
                         "Steam is open, but no logged-in Steam account was detected.\n\nPlease sign in to Steam and relaunch Wauncher.");
-                    desktop.Shutdown();
+                    Environment.Exit(4);
                     return;
                 }
 

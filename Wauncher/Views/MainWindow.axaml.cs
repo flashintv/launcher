@@ -537,7 +537,7 @@ namespace Wauncher.Views
 
                 if (selected != null && !selected.IsNone && !string.IsNullOrEmpty(selected.IpPort) && Game.IsRunning())
                 {
-                    Wauncher.Utils.ConsoleManager.ShowError(
+                    ConsoleManager.ShowError(
                         "ClassicCounter is already running.\n\nPlease close the game before joining a server from Wauncher.");
                     return;
                 }
@@ -577,7 +577,7 @@ namespace Wauncher.Views
             }
             catch (Exception ex)
             {
-                Wauncher.Utils.ConsoleManager.ShowError($"Failed to launch game:\n{ex.Message}");
+                ConsoleManager.ShowError($"Failed to launch game:\n{ex.Message}");
             }
             finally
             {
