@@ -1,5 +1,8 @@
 ﻿using Microsoft.Win32;
 using Gameloop.Vdf;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text.Unicode;
 
 namespace Wauncher.Utils
 {
@@ -9,18 +12,30 @@ namespace Wauncher.Utils
         public static string? recentSteamID2 { get; private set; }
 
         private static string? steamPath { get; set; }
+
         private static string? GetSteamInstallPath()
         {
+            // If was already found return it right away.
+            if (steamPath != null)
+                return steamPath;
+
+            // Try finding it registry.
             using (RegistryKey hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
             {
                 using (RegistryKey? key = hklm.OpenSubKey(@"SOFTWARE\Wow6432Node\Valve\Steam") ?? hklm.OpenSubKey(@"SOFTWARE\Valve\Steam"))
                 {
                     steamPath = key?.GetValue("InstallPath") as string;
-                    if (Debug.Enabled())
-                        Terminal.Debug($"Steam folder found at {steamPath}");
-                    return steamPath;
+                    if (steamPath != null)
+                    {
+                        if (Debug.Enabled())
+                            Terminal.Debug($"Steam folder found at {steamPath}");
+                        return steamPath;
+                    }
                 }
             }
+
+            // If registry didn't work, try natively.
+            return steamPath = SteamNative.GetSteamInstallPath();
         }
 
         public static bool IsInstalled()
