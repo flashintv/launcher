@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
@@ -24,7 +24,7 @@ namespace Wauncher
             ProtocolManager.RegisterURIHandler();
         }
 
-        public override void OnFrameworkInitializationCompleted()
+        public override async void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -34,7 +34,7 @@ namespace Wauncher
                 {
                     ConsoleManager.ShowError(
                         "Steam is required to use Wauncher.\n\nPlease install Steam and relaunch.");
-                    Environment.Exit(1);
+                    desktop.Shutdown();
                     return;
                 }
 
@@ -42,7 +42,7 @@ namespace Wauncher
                 {
                     ConsoleManager.ShowError(
                         "Steam must be open before using Wauncher.\n\nPlease open Steam, then relaunch Wauncher.");
-                    Environment.Exit(2);
+                    desktop.Shutdown();
                     return;
                 }
 
@@ -50,16 +50,16 @@ namespace Wauncher
                 {
                     ConsoleManager.ShowError(
                         "ClassicCounter is already running.\n\nPlease close the game before opening Wauncher again.");
-                    Environment.Exit(3);
+                    desktop.Shutdown();
                     return;
                 }
 
-                bool hasRecentSteamUser = Steam.GetRecentLoggedInSteamID(false).GetAwaiter().GetResult();
+                bool hasRecentSteamUser = await Steam.GetRecentLoggedInSteamID(false);
                 if (!hasRecentSteamUser)
                 {
                     ConsoleManager.ShowError(
                         "Steam is open, but no logged-in Steam account was detected.\n\nPlease sign in to Steam and relaunch Wauncher.");
-                    Environment.Exit(4);
+                    desktop.Shutdown();
                     return;
                 }
 
