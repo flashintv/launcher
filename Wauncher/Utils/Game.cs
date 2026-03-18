@@ -2,6 +2,8 @@ using CSGSI;
 using CSGSI.Nodes;
 using System.Diagnostics;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Text;
 
 namespace Wauncher.Utils
 {
@@ -15,6 +17,9 @@ namespace Wauncher.Utils
         private static string _map = "main_menu";
         private static int _scoreCT = 0;
         private static int _scoreT = 0;
+        private static string? _pendingConnectTarget;
+        private static int _pendingNetConPort;
+        private static int _pendingConnectTriggered;
 
         public static bool IsRunning()
         {
@@ -29,6 +34,13 @@ namespace Wauncher.Utils
             }
         }
 
+        public static void QueueDeferredConnect(string ipPort)
+        {
+            _pendingConnectTarget = string.IsNullOrWhiteSpace(ipPort) ? null : ipPort.Trim();
+            _pendingNetConPort = string.IsNullOrWhiteSpace(_pendingConnectTarget) ? 0 : GeneratePort();
+            _pendingConnectTriggered = 0;
+        }
+
         public static async Task<bool> Launch()
         {
             List<string> arguments = Argument.GenerateGameArguments();
@@ -40,7 +52,7 @@ namespace Wauncher.Utils
 
             string gameStatePath = Path.Combine(directory, "csgo", "cfg", "gamestate_integration_cc.cfg");
 
-            if (settings.DiscordRpc)
+            if (settings.DiscordRpc || !string.IsNullOrWhiteSpace(_pendingConnectTarget))
             {
                 EnsureGameStateListenerStarted();
 
@@ -88,6 +100,13 @@ namespace Wauncher.Utils
             _process.StartInfo.FileName = Path.Combine(directory, gameExe);
             _process.StartInfo.Arguments = string.Join(" ", arguments);
             _process.StartInfo.WorkingDirectory = directory;
+
+            if (_pendingNetConPort > 0)
+            {
+                _process.StartInfo.Arguments = string.IsNullOrWhiteSpace(_process.StartInfo.Arguments)
+                    ? $"-netconport {_pendingNetConPort}"
+                    : $"{_process.StartInfo.Arguments} -netconport {_pendingNetConPort}";
+            }
 
             if (!File.Exists(_process.StartInfo.FileName))
             {
@@ -162,6 +181,9 @@ namespace Wauncher.Utils
             _map = "main_menu";
             _scoreCT = 0;
             _scoreT = 0;
+            _pendingConnectTarget = null;
+            _pendingNetConPort = 0;
+            _pendingConnectTriggered = 0;
         }
 
         private static void EnsureGameStateListenerStarted()
@@ -196,6 +218,55 @@ namespace Wauncher.Utils
             return port;
         }
 
-        public static void OnNewGameState(GameState gs) => _node = gs.Map;
+        public static void OnNewGameState(GameState gs)
+        {
+            _node = gs.Map;
+
+            if (!string.IsNullOrWhiteSpace(_pendingConnectTarget) &&
+                _pendingNetConPort > 0 &&
+                Interlocked.Exchange(ref _pendingConnectTriggered, 1) == 0)
+            {
+                _ = Task.Run(SendDeferredConnectWhenReadyAsync);
+            }
+        }
+
+        private static async Task SendDeferredConnectWhenReadyAsync()
+        {
+            string? target = _pendingConnectTarget;
+            int port = _pendingNetConPort;
+            if (string.IsNullOrWhiteSpace(target) || port <= 0)
+            {
+                _pendingConnectTriggered = 0;
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3));
+
+                for (int attempt = 0; attempt < 10; attempt++)
+                {
+                    try
+                    {
+                        using var client = new TcpClient();
+                        await client.ConnectAsync("127.0.0.1", port);
+                        using var stream = client.GetStream();
+                        using var writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true, NewLine = "\n" };
+                        await writer.WriteLineAsync($"connect {target}");
+                        _pendingConnectTarget = null;
+                        _pendingNetConPort = 0;
+                        return;
+                    }
+                    catch
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(1));
+                    }
+                }
+            }
+            finally
+            {
+                _pendingConnectTriggered = 0;
+            }
+        }
     }
 }

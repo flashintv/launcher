@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Net;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia;
@@ -556,8 +557,8 @@ namespace Wauncher.Views
 
                 if (selected != null && !selected.IsNone && !string.IsNullOrEmpty(selected.IpPort))
                 {
-                    Argument.AddArgument("+connect");
-                    Argument.AddArgument(selected.IpPort);
+                    var connectTarget = await ResolveConnectTargetAsync(selected.IpPort);
+                    Game.QueueDeferredConnect(connectTarget);
                 }
 
                 var launched = await Game.Launch();
@@ -1895,6 +1896,38 @@ exit /b 0
 
             if (current.Length > 0)
                 yield return current.ToString();
+        }
+
+        private static async Task<string> ResolveConnectTargetAsync(string ipPort)
+        {
+            if (string.IsNullOrWhiteSpace(ipPort))
+                return ipPort;
+
+            var parts = ipPort.Split(':', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
+                return ipPort;
+
+            var host = parts[0];
+            var port = parts[1];
+
+            if (IPAddress.TryParse(host, out _))
+                return ipPort;
+
+            try
+            {
+                var addresses = await Dns.GetHostAddressesAsync(host);
+                var preferred = addresses.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    ?? addresses.FirstOrDefault();
+
+                if (preferred == null)
+                    return ipPort;
+
+                return $"{preferred}:{port}";
+            }
+            catch
+            {
+                return ipPort;
+            }
         }
 
     }
