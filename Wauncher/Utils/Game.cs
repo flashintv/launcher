@@ -42,11 +42,7 @@ namespace Wauncher.Utils
 
             if (settings.DiscordRpc)
             {
-                _port = GeneratePort();
-
-                _listener = new($"http://localhost:{_port}/");
-                _listener.NewGameState += OnNewGameState;
-                _listener.Start();
+                EnsureGameStateListenerStarted();
 
                 try
                 {
@@ -161,12 +157,30 @@ namespace Wauncher.Utils
                 await Task.Delay(2000);
             }
 
-            _listener?.Stop();
-            _listener = null;
+            _process = null;
             _node = null;
             _map = "main_menu";
             _scoreCT = 0;
             _scoreT = 0;
+        }
+
+        private static void EnsureGameStateListenerStarted()
+        {
+            if (_listener != null)
+                return;
+
+            _port = GeneratePort();
+
+            var listener = new GameStateListener($"http://localhost:{_port}/");
+            listener.NewGameState += OnNewGameState;
+
+            if (!listener.Start())
+            {
+                listener.NewGameState -= OnNewGameState;
+                throw new InvalidOperationException("Couldn't start Wauncher's local game state listener.");
+            }
+
+            _listener = listener;
         }
 
         private static int GeneratePort()
