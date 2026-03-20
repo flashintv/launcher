@@ -21,7 +21,7 @@ namespace Wauncher.Utils
                 return steamPath;
 
             // Try finding it registry.
-            using (RegistryKey hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+            /*using (RegistryKey hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
             {
                 using (RegistryKey? key = hklm.OpenSubKey(@"SOFTWARE\Wow6432Node\Valve\Steam") ?? hklm.OpenSubKey(@"SOFTWARE\Valve\Steam"))
                 {
@@ -33,7 +33,7 @@ namespace Wauncher.Utils
                         return steamPath;
                     }
                 }
-            }
+            }*/
 
             // If registry didn't work, try natively.
             return steamPath = SteamNative.GetSteamInstallPath();
@@ -68,7 +68,7 @@ namespace Wauncher.Utils
                 return false;
             }
 
-            var loginUsersPath = Path.Combine(steamPath, "config", "loginusers.vdf");
+            /*var loginUsersPath = Path.Combine(steamPath, "config", "loginusers.vdf");
             if (!File.Exists(loginUsersPath))
             {
                 if (!exitOnMissing)
@@ -113,7 +113,11 @@ namespace Wauncher.Utils
             {
                 recentSteamID64 = fallbackSteamId64;
                 recentSteamID2 = ConvertToSteamID2(fallbackSteamId64);
-            }
+            }*/
+
+            recentSteamID2 = SteamNative.GetSteamID2();
+            recentSteamID64 = SteamNative.GetSteamID64();
+
             if (Debug.Enabled() && !string.IsNullOrEmpty(recentSteamID64))
             {
                 Terminal.Debug($"Most recent Steam account (SteamID64): {recentSteamID64}");

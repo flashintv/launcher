@@ -17,6 +17,12 @@ namespace Wauncher.Utils
         private static extern IntPtr SteamAPI64_GetSteamInstallPath();
         [DllImport("platform/steam_api64", EntryPoint = "SteamAPI_Shutdown", CallingConvention = CallingConvention.Cdecl)]
         private static extern void SteamAPI64_Shutdown();
+        [DllImport("platform/steam_api64", EntryPoint = "SteamAPI_SteamUser_v023", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr SteamAPI64_SteamUser();
+        [DllImport("platform/steam_api64", EntryPoint = "SteamAPI_ISteamUser_GetSteamID", CallingConvention = CallingConvention.Cdecl)]
+        private static extern UInt64 SteamAPI64_ISteamUser_GetSteamID(IntPtr steamuser);
+        [DllImport("platform/steam_api64", EntryPoint = "SteamAPI_ISteamUser_BLoggedOn", CallingConvention = CallingConvention.Cdecl)]
+        private static extern bool SteamAPI64_ISteamUser_BLoggedOn(IntPtr steamuser);
 
         // 32-bit steam_api calls
         [DllImport("platform/steam_api", EntryPoint = "SteamAPI_InitFlat", CallingConvention = CallingConvention.Cdecl)]
@@ -25,8 +31,20 @@ namespace Wauncher.Utils
         private static extern IntPtr SteamAPI_GetSteamInstallPath();
         [DllImport("platform/steam_api", EntryPoint = "SteamAPI_Shutdown", CallingConvention = CallingConvention.Cdecl)]
         private static extern void SteamAPI_Shutdown();
+        [DllImport("platform/steam_api", EntryPoint = "SteamAPI_SteamUser_v023", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr SteamAPI_SteamUser();
+        [DllImport("platform/steam_api", EntryPoint = "SteamAPI_ISteamUser_GetSteamID", CallingConvention = CallingConvention.Cdecl)]
+        private static extern UInt64 SteamAPI_ISteamUser_GetSteamID(IntPtr steamuser);
+        [DllImport("platform/steam_api", EntryPoint = "SteamAPI_ISteamUser_BLoggedOn", CallingConvention = CallingConvention.Cdecl)]
+        private static extern bool SteamAPI_ISteamUser_BLoggedOn(IntPtr steamuser);
+
 
         private static string? _steamPath = null;
+
+        private static string? _steamId2 = null;
+        private static string? _steamId64 = null;
+
+        private static UInt64 _rawSteamId64 = 0;
 
         public static string? GetSteamInstallPath()
         {
@@ -63,10 +81,52 @@ namespace Wauncher.Utils
                     return null;
                 }
                 _steamPath = Marshal.PtrToStringUTF8(Environment.Is64BitProcess ? SteamAPI64_GetSteamInstallPath() : SteamAPI_GetSteamInstallPath());
+
+                IntPtr steamuser = 0;
+                if (Environment.Is64BitProcess) steamuser = SteamAPI64_SteamUser(); else steamuser = SteamAPI_SteamUser();
+               
+                if (steamuser != IntPtr.Zero)
+                {
+                    if (Environment.Is64BitProcess ? SteamAPI64_ISteamUser_BLoggedOn(steamuser) : SteamAPI_ISteamUser_BLoggedOn(steamuser))
+                    {
+                        if (Environment.Is64BitProcess) 
+                            _rawSteamId64 = SteamAPI64_ISteamUser_GetSteamID(steamuser); 
+                        else 
+                            _rawSteamId64 = SteamAPI_ISteamUser_GetSteamID(steamuser);
+
+                        _steamId64 = _rawSteamId64.ToString();
+                        _steamId2 = ConvertToSteamID2(_steamId64);
+                        //ConsoleManager.ShowError($"SteamId64: '{_steamId64}' ({_rawSteamId64}) | SteamId2: '{_steamId2}'");
+                    }
+                    else
+                    {
+                        ConsoleManager.ShowError("You're not logged into Steam. Login and try again.");
+                    }
+                }
+
                 if (Environment.Is64BitProcess) SteamAPI64_Shutdown(); else SteamAPI_Shutdown();
             }
 
             return _steamPath;
+        }
+
+        public static string? GetSteamID64()
+        {
+            return _steamId64;
+        }
+        public static string? GetSteamID2()
+        {
+            return _steamId2;
+        }
+
+        private static string ConvertToSteamID2(string steamID64)
+        {
+            ulong id64 = ulong.Parse(steamID64);
+            ulong constValue = 76561197960265728;
+            ulong accountID = id64 - constValue;
+            ulong y = accountID % 2;
+            ulong z = accountID / 2;
+            return $"STEAM_1:{y}:{z}";
         }
     }
 }
