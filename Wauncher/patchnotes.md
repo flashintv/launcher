@@ -1,5 +1,5 @@
 # Hotfix 
-03/18/2026
+## 03/18/2026
 ## What's Changed
 - Fixed context menu when page is not in initial position (is scrolled down)
 - Changed how Newest and Oldest sorting works, and added two new sorting methods based on item ID
@@ -14,7 +14,7 @@
 - Trading is no longer under maintainance and is now again available to the public
 
 # Hotfix 
-03/08/2026
+## 03/08/2026
 ## What's Changed
 - Updated appearance of the "Edit Profile" page on eddies.cc
 - Profiles on eddies.cc are now limited to a maximum level of 6,199
@@ -25,7 +25,7 @@
 - Groups on eddies.cc will direct to the vanity URL that matches the group name if no custom group URL is set when editing profile
 
 # Anniversary Update 
-03/04/2026
+## 03/04/2026
 ## What's Changed
 - Donors now permanently get an extra drop at the end of each match, on top of the extra drop during this month's event. We're grateful for your support!
 - NOVAGANG Collection drops have been reverted back to normal rates.
@@ -37,7 +37,7 @@
 - Bug fixes and security improvements.
 
 # Hotfix
-02/16/2026
+## 02/16/2026
 ## What's Changed
 - Fixed NOVAGANG Collection drop names and images not appearing in game (make sure to run the launcher)
 - CZ-75 now works again on team Terrorists
@@ -47,7 +47,7 @@
 - Backend fixes and improvements
 
 # NOVAGANG Collection Update
-02/15/2026
+## 02/15/2026
 ## What's Changed
 - Added NOVAGANG Sticker Capsule
 - Added Dysocjacja by Exodus1900
