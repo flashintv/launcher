@@ -3,6 +3,7 @@ using Gameloop.Vdf;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Unicode;
+using Microsoft.CSharp.RuntimeBinder;
 
 namespace Wauncher.Utils
 {
@@ -81,14 +82,37 @@ namespace Wauncher.Utils
             }
 
             dynamic loginUsers = VdfConvert.Deserialize(File.ReadAllText(loginUsersPath));
+            string? fallbackSteamId64 = null;
+
             foreach (var user in loginUsers.Value)
             {
-                var mostRecent = user.Value.MostRecent.Value;
-                if (mostRecent == "1")
+                string? steamId64 = null;
+
+                try
                 {
-                    recentSteamID64 = user.Key;
-                    recentSteamID2 = ConvertToSteamID2(user.Key);
+                    steamId64 = Convert.ToString(user.Key);
+                    if (string.IsNullOrWhiteSpace(fallbackSteamId64) && !string.IsNullOrWhiteSpace(steamId64))
+                        fallbackSteamId64 = steamId64;
+
+                    var mostRecent = Convert.ToString(user.Value?.MostRecent?.Value);
+                    if (mostRecent == "1" && !string.IsNullOrWhiteSpace(steamId64))
+                    {
+                        recentSteamID64 = steamId64;
+                        recentSteamID2 = ConvertToSteamID2(steamId64);
+                        break;
+                    }
                 }
+                catch (RuntimeBinderException)
+                {
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Skipping malformed Steam loginusers entry for {steamId64 ?? "unknown user"}.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(recentSteamID64) && !string.IsNullOrWhiteSpace(fallbackSteamId64))
+            {
+                recentSteamID64 = fallbackSteamId64;
+                recentSteamID2 = ConvertToSteamID2(fallbackSteamId64);
             }
             if (Debug.Enabled() && !string.IsNullOrEmpty(recentSteamID64))
             {
